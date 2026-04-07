@@ -51,7 +51,7 @@ def build_rtn_frame(
     reference_pos_eci_m: np.ndarray,
     reference_vel_eci_mps: np.ndarray,
 ) -> np.ndarray:
-    """Return the ECI->RTN rotation matrix using the HPOP reference orbit."""
+    """Return the ECI->RTN rotation matrix for the chosen reference orbit."""
     r_hat = reference_pos_eci_m / np.linalg.norm(reference_pos_eci_m)
     n_hat = np.cross(reference_pos_eci_m, reference_vel_eci_mps)
     n_hat = n_hat / np.linalg.norm(n_hat)
@@ -62,26 +62,25 @@ def build_rtn_frame(
 
 def compute_rtn_residual_if_missing(npz_data: Any) -> tuple[np.ndarray, np.ndarray]:
     """
-    Current stage: use HPOP as the EKF-corrected ephemeris surrogate
-    only for offline single-satellite experiments.
+    Keep the residual basis aligned with the stored SGP4-centered RTN frame so
+    the predicted RTN correction can be rotated back into ECI consistently.
     """
+    sgp4_eci_pos_m = np.asarray(npz_data["sgp4_eci_pos_m"], dtype=np.float64)
+    sgp4_eci_vel_mps = np.asarray(npz_data["sgp4_eci_vel_mps"], dtype=np.float64)
     hpop_eci_pos_m = np.asarray(npz_data["hpop_eci_pos_m"], dtype=np.float64)
-    hpop_eci_vel_mps = np.asarray(npz_data["hpop_eci_vel_mps"], dtype=np.float64)
 
-    frames_eci_to_rtn = np.stack(
-        [build_rtn_frame(hpop_eci_pos_m[idx], hpop_eci_vel_mps[idx]) for idx in range(hpop_eci_pos_m.shape[0])],
-        axis=0,
-    )
+    if "rtn_frame_eci_to_rtn" in npz_data:
+        frames_eci_to_rtn = np.asarray(npz_data["rtn_frame_eci_to_rtn"], dtype=np.float64)
+    else:
+        frames_eci_to_rtn = np.stack(
+            [build_rtn_frame(sgp4_eci_pos_m[idx], sgp4_eci_vel_mps[idx]) for idx in range(sgp4_eci_pos_m.shape[0])],
+            axis=0,
+        )
 
     if "residual_rtn_pos_m" in npz_data:
         residual_rtn_pos_m = np.asarray(npz_data["residual_rtn_pos_m"], dtype=np.float64)
         return residual_rtn_pos_m, frames_eci_to_rtn
 
-    if "sgp4_to_hpop_pos_rtn_m" in npz_data:
-        residual_rtn_pos_m = np.asarray(npz_data["sgp4_to_hpop_pos_rtn_m"], dtype=np.float64)
-        return residual_rtn_pos_m, frames_eci_to_rtn
-
-    sgp4_eci_pos_m = np.asarray(npz_data["sgp4_eci_pos_m"], dtype=np.float64)
     residual_eci_pos_m = hpop_eci_pos_m - sgp4_eci_pos_m
     residual_rtn_pos_m = np.einsum("nij,nj->ni", frames_eci_to_rtn, residual_eci_pos_m)
     return residual_rtn_pos_m, frames_eci_to_rtn
@@ -871,7 +870,11 @@ def save_optuna_optimization_history_plot(study: optuna.Study, figure_path: Path
 
 
 def save_optuna_parameter_importance_plot(study: optuna.Study, figure_path: Path) -> None:
-    importances = get_param_importances(study)
+    try:
+        importances = get_param_importances(study)
+    except ImportError as exc:
+        print(f"Skipping Optuna parameter importance plot because sklearn is unavailable: {exc}")
+        return
     if not importances:
         return
 

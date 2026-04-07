@@ -1,7 +1,8 @@
-numpy>=2.0
+numpy>=1.24,<3
 orekit-jpype>=13.1
 jpype1>=1.5
 requests>=2.31
 torch>=2.2
 matplotlib>=3.8
 optuna>=3.6
+scikit-learn>=1.3

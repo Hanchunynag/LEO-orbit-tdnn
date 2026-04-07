@@ -385,8 +385,8 @@ def compute_rtn_residual_series(
     for index in range(sample_count):
         rtn_frame = build_rtn_frame(reference_pos_eci_m[index], reference_vel_eci_mps[index])
         rtn_frames[index] = rtn_frame
-        position_residual_rtn_m[index] = rtn_frame.T @ (target_pos_eci_m[index] - reference_pos_eci_m[index])
-        velocity_residual_rtn_mps[index] = rtn_frame.T @ (target_vel_eci_mps[index] - reference_vel_eci_mps[index])
+        position_residual_rtn_m[index] = rtn_frame @ (target_pos_eci_m[index] - reference_pos_eci_m[index])
+        velocity_residual_rtn_mps[index] = rtn_frame @ (target_vel_eci_mps[index] - reference_vel_eci_mps[index])
 
     return rtn_frames, position_residual_rtn_m, velocity_residual_rtn_mps
 
@@ -605,6 +605,8 @@ def generate_satellite_data_files(max_satellites: int | None = None) -> list[dic
             sgp4_ecef_pos_m=sgp4_ecef_pos,
             sgp4_ecef_vel_mps=sgp4_ecef_vel,
             rtn_frame_eci_to_rtn=rtn_frames_eci_to_rtn,
+            residual_rtn_pos_m=sgp4_to_hpop_pos_rtn_m,
+            residual_rtn_vel_mps=sgp4_to_hpop_vel_rtn_mps,
             sgp4_to_hpop_pos_rtn_m=sgp4_to_hpop_pos_rtn_m,
             sgp4_to_hpop_vel_rtn_mps=sgp4_to_hpop_vel_rtn_mps,
         )
